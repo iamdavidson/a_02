@@ -1,0 +1,9 @@
+date: 2026-07-07T16:39:27+02:00
+host: cip101.informatik.uni-osnabrueck.de
+os: Linux 6.8.0-124-generic x86_64 GNU/Linux
+distro: Ubuntu 24.04.4 LTS
+cpu_threads: 12
+cpu_model: Intel(R) Core(TM) i5-10500 CPU @ 3.10GHz
+memory: 31Gi
+compiler: g++-12 (Ubuntu 12.4.0-2ubuntu1~24.04.1) 12.4.0
+python: Python 3.12.3
