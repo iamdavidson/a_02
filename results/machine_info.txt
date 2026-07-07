@@ -1,0 +1,18 @@
+date: 2026-07-07T18:03:37+02:00
+host: cip101.informatik.uni-osnabrueck.de
+os: Linux 6.8.0-124-generic x86_64 GNU/Linux
+distro: Ubuntu 24.04.4 LTS
+cpu_threads: 12
+cpu_model: Intel(R) Core(TM) i5-10500 CPU @ 3.10GHz
+memory: 31Gi
+compiler: g++-12 (Ubuntu 12.4.0-2ubuntu1~24.04.1) 12.4.0
+python: Python 3.12.3
+cpu_mhz_min: 800.0000
+cpu_mhz_max: 4500.0000
+cpu_governor: powersave
+cpu_scaling_driver: intel_pstate
+turbo_boost: enabled (intel_pstate no_turbo=0)
+threads_per_core: 2
+smt_active: 1
+numa_nodes: 1
+cpu_idle_states: POLL,C1_ACPI,C2_ACPI,C3_ACPI
