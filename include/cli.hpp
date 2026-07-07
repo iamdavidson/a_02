@@ -8,6 +8,7 @@
 #include <string_view>
 #include <charconv>
 #include <iostream>
+#include <limits>
 
 // ==============================================================
 // Argument parsing
@@ -18,8 +19,11 @@
 // arguments are errors: they print to std::cerr and abort parsing,
 // keeping stdout free for CSV data.
 //
-// Backoff arguments (--backoff-min / --backoff-max) are added in
-// Phase 7, not here.
+// Backoff arguments (--backoff-min / --backoff-max) are non-negative
+// integers. They are REQUIRED for --lock backoff (with
+// backoff-min <= backoff-max) and IGNORED for every other lock. This
+// keeps one uniform CLI and a single campaign path; the choice is
+// documented here and in the usage text.
 
 // Parsed and validated command line.
 struct Config {
@@ -27,6 +31,8 @@ struct Config {
     std::string lock_name;   // canonical name, reused for CSV output later
     std::size_t jobs{};
     std::size_t samples{};
+    int backoff_min{0};      // used only for --lock backoff
+    int backoff_max{0};      // used only for --lock backoff
 };
 
 // One shared error path for all CLI failures: message plus usage, on
@@ -35,8 +41,11 @@ inline void print_error(std::string_view msg) {
 
     std::cerr << "error: " << msg << "\n"
               << "usage: locks --lock <id> --jobs <n> --samples <n>\n"
-              << "  <id>: atomic | tas | ttas | backoff | aq | alog | mcs\n"
-              << "  <n> : positive integer (>= 1)\n";
+              << "             [--backoff-min <m> --backoff-max <M>]\n"
+              << "  <id>    : atomic | tas | ttas | backoff | aq | alog | mcs\n"
+              << "  <n>     : positive integer (>= 1)\n"
+              << "  <m>,<M> : non-negative integers; required for --lock backoff\n"
+              << "            (backoff-min <= backoff-max), ignored for other locks\n";
 }
 
 // Parse a whole token as a std::size_t.
@@ -69,6 +78,13 @@ inline std::optional<Config> parse_args(int argc, char* argv[]) {
     std::string lock_name;
     std::optional<std::size_t> jobs;
     std::optional<std::size_t> samples;
+    std::optional<std::size_t> backoff_min;
+    std::optional<std::size_t> backoff_max;
+
+    // Upper bound for the backoff values: they are stored as int in the
+    // lock, so reject anything that would not fit.
+    constexpr std::size_t int_max =
+        static_cast<std::size_t>(std::numeric_limits<int>::max());
 
     int i = 1;
     while (i < argc) {
@@ -110,6 +126,20 @@ inline std::optional<Config> parse_args(int argc, char* argv[]) {
                 return std::nullopt;
             }
         }
+        else if (flag == "--backoff-min") {
+            backoff_min = parse_size(value);
+            if (!backoff_min || *backoff_min > int_max) {
+                print_error("--backoff-min must be a non-negative integer");
+                return std::nullopt;
+            }
+        }
+        else if (flag == "--backoff-max") {
+            backoff_max = parse_size(value);
+            if (!backoff_max || *backoff_max > int_max) {
+                print_error("--backoff-max must be a non-negative integer");
+                return std::nullopt;
+            }
+        }
         else {
             print_error(std::string("unknown argument: ") + std::string(flag));
             return std::nullopt;
@@ -124,10 +154,35 @@ inline std::optional<Config> parse_args(int argc, char* argv[]) {
         return std::nullopt;
     }
 
+    // Backoff arguments are required for --lock backoff (with
+    // min <= max) and ignored for every other lock.
+    if (*lock == LockId::backoff) {
+        if (!backoff_min || !backoff_max) {
+            print_error("--lock backoff requires --backoff-min and --backoff-max");
+            return std::nullopt;
+        }
+        if (*backoff_min > *backoff_max) {
+            print_error("--backoff-min must be <= --backoff-max");
+            return std::nullopt;
+        }
+    }
+
     Config config;
     config.lock = *lock;
-    config.lock_name = lock_name;
     config.jobs = *jobs;
     config.samples = *samples;
+
+    if (*lock == LockId::backoff) {
+        config.backoff_min = static_cast<int>(*backoff_min);
+        config.backoff_max = static_cast<int>(*backoff_max);
+
+        // The CSV lock name carries the parameters: backoff-<min>-<max>.
+        config.lock_name = "backoff-" + std::to_string(config.backoff_min)
+                         + "-" + std::to_string(config.backoff_max);
+    }
+    else {
+        config.lock_name = lock_name;
+    }
+
     return config;
 }

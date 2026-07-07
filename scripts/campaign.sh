@@ -1,15 +1,20 @@
 #!/usr/bin/env bash
 # ==============================================================
-# Initial campaign
+# Campaign (all locks except backoff)
 # ==============================================================
-# Runs the initial campaign from the assignment (Table 1):
-#   locks   = atomic, tas, ttas
+# Measures every lock with fixed parameters over the assignment's job
+# counts:
+#   locks   = atomic, tas, ttas, aq, alog, mcs
 #   jobs    = 1, 2, 4, 6, 8, 10
 #   samples = 50
 #
-# One clean CSV per lock is written into results/. Rerunning the script
-# just regenerates the CSVs from scratch, so it is reproducible and
-# restartable: if it stops, run it again.
+# backoff is NOT run here: it has its own parameter sweep in
+# backoff_explore.sh, and the final backoff.csv is taken from the best
+# combination of that sweep. Use run_all.sh to do both in one round.
+#
+# This is a superset of the initial atomic/tas/ttas campaign (Table 1):
+# rerunning regenerates every CSV from scratch, so it is reproducible
+# and restartable. If it stops, run it again.
 
 set -euo pipefail
 
@@ -26,8 +31,8 @@ g++-12 -std=c++20 -O2 -Wall -Wextra -pedantic -Wno-interference-size \
 # Record the measurement environment next to the results.
 bash "$root/scripts/machine_info.sh" > "$out/machine_info.txt"
 
-# Campaign parameters (Table 1).
-locks="atomic tas ttas"
+# Campaign parameters (all fixed-parameter locks; backoff is separate).
+locks="atomic tas ttas aq alog mcs"
 jobs_list="1 2 4 6 8 10"
 samples=50
 

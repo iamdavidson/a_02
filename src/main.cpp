@@ -27,16 +27,22 @@ static void worker(Ticker& ticker) {
 // ==============================================================
 // Lock creation
 // ==============================================================
-// Build the concrete Lock for a given id. The atomic baseline has no
-// lock and is handled separately, so it never reaches here. Locks that
-// are added in later phases return nullptr for now, which main treats
-// as "not implemented yet".
-static std::unique_ptr<Lock> make_lock(LockId id) {
+// Build the concrete Lock for a given config. The atomic baseline has
+// no lock and is handled separately, so it never reaches here. backoff
+// takes its min/max window and aq its thread count from the config. All
+// lock ids are implemented; the default case is a defensive fallback
+// (main reports it) in case a new LockId is added without wiring here.
+static std::unique_ptr<Lock> make_lock(const Config& config) {
 
-    switch (id) {
-        case LockId::tas:  return std::make_unique<TASLock>();
-        case LockId::ttas: return std::make_unique<TTASLock>();
-        default:           return nullptr;
+    switch (config.lock) {
+        case LockId::tas:     return std::make_unique<TASLock>();
+        case LockId::ttas:    return std::make_unique<TTASLock>();
+        case LockId::backoff: return std::make_unique<BackoffLock>(config.backoff_min,
+                                                                   config.backoff_max);
+        case LockId::aq:      return std::make_unique<ALock>(config.jobs);
+        case LockId::alog:    return std::make_unique<ALogLock>();
+        case LockId::mcs:     return std::make_unique<MCSLock>();
+        default:              return nullptr;
     }
 }
 
@@ -92,7 +98,7 @@ int main(int argc, char* argv[]) {
 
     std::unique_ptr<Lock> lock;
     if (!is_atomic) {
-        lock = make_lock(config->lock);
+        lock = make_lock(*config);
         if (!lock) {
             std::cerr << "error: lock '" << config->lock_name
                       << "' is not implemented yet\n";
